@@ -9,6 +9,8 @@ import ssl
 import time
 import schedule
 import random
+import pytz
+from datetime import datetime
 from google.api_core import retry
 from google.api_core.exceptions import ResourceExhausted
 from slack_sdk.errors import SlackApiError
@@ -56,8 +58,11 @@ def with_retry(func, max_retries=3):
             raise
 
 
-def get_current_time():
-    return time.strftime("%d %b %Y %H:%M:%S")
+def convert_utc_to_jakarta(time):
+    utc_time = time.replace(tzinfo=pytz.utc)
+    jakarta_tz = pytz.timezone("Asia/Jakarta")
+    changed_timezone = utc_time.astimezone(jakarta_tz)
+    return changed_timezone.strftime("%Y-%m-%d %H:%M:%S")
 
 
 header_cache = {}
@@ -253,7 +258,11 @@ def send_question_to_slack(row_number):
         },
     ]
     options = [option_a, option_b, option_c, option_d, option_e]
-    if contains_image(question) or any(contains_image(opt) for opt in options):
+    if (
+        contains_image(question)
+        or any(contains_image(opt) for opt in options)
+        or len(question) > 2900
+    ):
         final_blocks = blocks
     else:
         final_blocks = full_blocks
@@ -264,12 +273,13 @@ def send_question_to_slack(row_number):
             text=f"Question #{question_id}",
             blocks=final_blocks,
         )
-
         sheet.update_cell(
             row_number, find_col_index(UTBK_COLS["STATUS_QC"]) + 1, "Assigned"
         )
         sheet.update_cell(
-            row_number, find_col_index(UTBK_COLS["STARTED_AT"]) + 1, get_current_time()
+            row_number,
+            find_col_index(UTBK_COLS["STARTED_AT"]) + 1,
+            convert_utc_to_jakarta(datetime.utcnow),
         )
         print(f"Sent question #{question_id} (row {row_number}) for QC")
         return True
@@ -296,7 +306,9 @@ def handle_approve(ack, body, client):
             row_number, find_col_index(UTBK_COLS["STATUS_QC"]) + 1, "Checked"
         )
         sheet.update_cell(
-            row_number, find_col_index(UTBK_COLS["APPROVED_AT"]) + 1, get_current_time()
+            row_number,
+            find_col_index(UTBK_COLS["APPROVED_AT"]) + 1,
+            convert_utc_to_jakarta(datetime.utcnow),
         )
 
         original_message = body["message"]
@@ -307,7 +319,7 @@ def handle_approve(ack, body, client):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"✅ *Approved* oleh <@{body['user']['id']}> pada {get_current_time()}",
+                    "text": f"✅ *Approved* oleh <@{body['user']['id']}> pada {convert_utc_to_jakarta(datetime.utcnow)}",
                 },
             }
 
@@ -404,7 +416,7 @@ def handle_rejection_submission(ack, body, client, view):
             sheet.update_cell(
                 row_number,
                 find_col_index(UTBK_COLS["REJECTED_AT"]) + 1,
-                get_current_time(),
+                convert_utc_to_jakarta(datetime.utcnow),
             )
 
             try:
@@ -423,7 +435,7 @@ def handle_rejection_submission(ack, body, client, view):
                             "type": "section",
                             "text": {
                                 "type": "mrkdwn",
-                                "text": f"❌ *Rejected* oleh <@{body['user']['id']}> pada {get_current_time()}\n*Alasan:* {reason}",
+                                "text": f"❌ *Rejected* oleh <@{body['user']['id']}> pada {convert_utc_to_jakarta(datetime.utcnow)}\n*Alasan:* {reason}",
                             },
                         },
                     ]
@@ -448,7 +460,11 @@ def handle_rejection_submission(ack, body, client, view):
 
             # Update spreadsheet
 
-            sheet.update_cell(row_number, ord(QC_COL) - 64, f"Rejected: {reason}")
+            sheet.update_cell(
+                row_number,
+                find_col_index(UTBK_COLS["QC_COL"]) + 1,
+                f"Rejected: {reason}",
+            )
 
             # Kirim notifikasi
             client.chat_postMessage(
