@@ -10,7 +10,7 @@ import time
 import schedule
 import random
 import pytz
-from datetime import datetime
+from datetime import datetime, UTC
 from google.api_core import retry
 from google.api_core.exceptions import ResourceExhausted
 from slack_sdk.errors import SlackApiError
@@ -22,6 +22,22 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SERVICE_ACCOUNT_FILE = "credentials.json"
 SHEET_ID = os.environ.get("GOOGLE_SHEET_ID")
 UTBK_COLS = {
+    "QUESTION_ID": "Question ID",
+    "EXAM_NAME": "Exam Name",
+    "SUBJECT": "Subject Name",
+    "CHAPTER": "Chapter Name",
+    "TOPIC": "Topic Name",
+    "CONCEPT_TITLE": "Concept Title",
+    "QUESTION_TYPE": "Question Type",
+    "QUESTION": "Question",
+    "QUESTION_ATTACHMENT": "Question Attachment (index - url - caption)",
+    "OPTION1": "Option 1",
+    "OPTION2": "Option 2",
+    "OPTION3": "Option 3",
+    "OPTION4": "Option 4",
+    "OPTION5": "Option 5",
+    "CORRECT_OPTION": "Correct Option",
+    "SOLUTION_ATTACHMENT": "Solution Attachment (index - url - caption)",
     "STATUS_QC": "Status",
     "SOLUTION": "Solution including Concepts",
     "QC_COL": "Hasil QC",
@@ -104,7 +120,6 @@ def contains_image(content):
 
 
 def check_for_new_questions():
-    """Periksa spreadsheet untuk soal baru yang perlu di-QC"""
     try:
         all_values = sheet.get_all_values()
 
@@ -119,19 +134,32 @@ def check_for_new_questions():
 
 
 def send_question_to_slack(row_number):
-    question_id = sheet.cell(row_number, 1).value
-    subject_name = sheet.cell(row_number, 3).value
-    chapter_name = sheet.cell(row_number, 4).value
-    topic_name = sheet.cell(row_number, 5).value
-    question = sheet.cell(row_number, 8).value
-    option_a = sheet.cell(row_number, 10).value
-    option_b = sheet.cell(row_number, 11).value
-    option_c = sheet.cell(row_number, 12).value
-    option_d = sheet.cell(row_number, 13).value
-    option_e = sheet.cell(row_number, 14).value
-    correct_option = sheet.cell(row_number, 15).value
-    solution_link = sheet.cell(row_number, 22).value
-    pic = sheet.cell(row_number, 26).value
+    question_id = sheet.cell(
+        row_number, find_col_index(UTBK_COLS["QUESTION_ID"]) + 1
+    ).value
+    subject_name = sheet.cell(
+        row_number, find_col_index(UTBK_COLS["SUBJECT"]) + 1
+    ).value
+    chapter_name = sheet.cell(
+        row_number, find_col_index(UTBK_COLS["CHAPTER"]) + 1
+    ).value
+    topic_name = sheet.cell(row_number, find_col_index(UTBK_COLS["TOPIC"]) + 1).value
+    question_type = sheet.cell(
+        row_number, find_col_index(UTBK_COLS["QUESTION_TYPE"]) + 1
+    ).value
+    question = sheet.cell(row_number, find_col_index(UTBK_COLS["QUESTION"]) + 1).value
+    option_a = sheet.cell(row_number, find_col_index(UTBK_COLS["OPTION1"]) + 1).value
+    option_b = sheet.cell(row_number, find_col_index(UTBK_COLS["OPTION2"]) + 1).value
+    option_c = sheet.cell(row_number, find_col_index(UTBK_COLS["OPTION3"]) + 1).value
+    option_d = sheet.cell(row_number, find_col_index(UTBK_COLS["OPTION4"]) + 1).value
+    option_e = sheet.cell(row_number, find_col_index(UTBK_COLS["OPTION5"]) + 1).value
+    correct_option = sheet.cell(
+        row_number, find_col_index(UTBK_COLS["CORRECT_OPTION"]) + 1
+    ).value
+    solution_link = sheet.cell(
+        row_number, find_col_index(UTBK_COLS["SOLUTION_LINK"]) + 1
+    ).value
+    pic = sheet.cell(row_number, find_col_index(UTBK_COLS["PIC"]) + 1).value
 
     blocks = [
         {
@@ -262,6 +290,7 @@ def send_question_to_slack(row_number):
         contains_image(question)
         or any(contains_image(opt) for opt in options)
         or len(question) > 2900
+        or question_type != "MCQ"
     ):
         final_blocks = blocks
     else:
@@ -279,7 +308,7 @@ def send_question_to_slack(row_number):
         sheet.update_cell(
             row_number,
             find_col_index(UTBK_COLS["STARTED_AT"]) + 1,
-            convert_utc_to_jakarta(datetime.utcnow()),
+            convert_utc_to_jakarta(datetime.now(UTC)),
         )
         print(f"Sent question #{question_id} (row {row_number}) for QC")
         return True
@@ -308,7 +337,7 @@ def handle_approve(ack, body, client):
         sheet.update_cell(
             row_number,
             find_col_index(UTBK_COLS["APPROVED_AT"]) + 1,
-            convert_utc_to_jakarta(datetime.utcnow()),
+            convert_utc_to_jakarta(datetime.now(UTC)),
         )
 
         original_message = body["message"]
@@ -319,7 +348,7 @@ def handle_approve(ack, body, client):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"✅ *Approved* oleh <@{body['user']['id']}> pada {convert_utc_to_jakarta(datetime.utcnow())}",
+                    "text": f"✅ *Approved* oleh <@{body['user']['id']}> pada {convert_utc_to_jakarta(datetime.now(UTC))}",
                 },
             }
 
@@ -416,7 +445,7 @@ def handle_rejection_submission(ack, body, client, view):
             sheet.update_cell(
                 row_number,
                 find_col_index(UTBK_COLS["REJECTED_AT"]) + 1,
-                convert_utc_to_jakarta(datetime.utcnow()),
+                convert_utc_to_jakarta(datetime.now(UTC)),
             )
 
             try:
@@ -435,7 +464,7 @@ def handle_rejection_submission(ack, body, client, view):
                             "type": "section",
                             "text": {
                                 "type": "mrkdwn",
-                                "text": f"❌ *Rejected* oleh <@{body['user']['id']}> pada {convert_utc_to_jakarta(datetime.utcnow())}\n*Alasan:* {reason}",
+                                "text": f"❌ *Rejected* oleh <@{body['user']['id']}> pada {convert_utc_to_jakarta(datetime.now(UTC))}\n*Alasan:* {reason}",
                             },
                         },
                     ]
