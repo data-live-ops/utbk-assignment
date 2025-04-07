@@ -10,7 +10,7 @@ import time
 import schedule
 import random
 import pytz
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from google.api_core import retry
 from google.api_core.exceptions import ResourceExhausted
 from slack_sdk.errors import SlackApiError
@@ -308,7 +308,7 @@ def send_question_to_slack(row_number):
         sheet.update_cell(
             row_number,
             find_col_index(UTBK_COLS["STARTED_AT"]) + 1,
-            convert_utc_to_jakarta(datetime.now(UTC)),
+            convert_utc_to_jakarta(datetime.now(timezone.utc)),
         )
         print(f"Sent question #{question_id} (row {row_number}) for QC")
         return True
@@ -337,7 +337,7 @@ def handle_approve(ack, body, client):
         sheet.update_cell(
             row_number,
             find_col_index(UTBK_COLS["APPROVED_AT"]) + 1,
-            convert_utc_to_jakarta(datetime.now(UTC)),
+            convert_utc_to_jakarta(datetime.now(timezone.utc)),
         )
 
         original_message = body["message"]
@@ -348,7 +348,7 @@ def handle_approve(ack, body, client):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"✅ *Approved* oleh <@{body['user']['id']}> pada {convert_utc_to_jakarta(datetime.now(UTC))}",
+                    "text": f"✅ *Approved* oleh <@{body['user']['id']}> pada {convert_utc_to_jakarta(datetime.now(timezone.utc))}",
                 },
             }
 
@@ -445,7 +445,7 @@ def handle_rejection_submission(ack, body, client, view):
             sheet.update_cell(
                 row_number,
                 find_col_index(UTBK_COLS["REJECTED_AT"]) + 1,
-                convert_utc_to_jakarta(datetime.now(UTC)),
+                convert_utc_to_jakarta(datetime.now(timezone.utc)),
             )
 
             try:
@@ -464,7 +464,7 @@ def handle_rejection_submission(ack, body, client, view):
                             "type": "section",
                             "text": {
                                 "type": "mrkdwn",
-                                "text": f"❌ *Rejected* oleh <@{body['user']['id']}> pada {convert_utc_to_jakarta(datetime.now(UTC))}\n*Alasan:* {reason}",
+                                "text": f"❌ *Rejected* oleh <@{body['user']['id']}> pada {convert_utc_to_jakarta(datetime.now(timezone.utc))}\n*Alasan:* {reason}",
                             },
                         },
                     ]
