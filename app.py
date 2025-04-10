@@ -134,174 +134,189 @@ def check_for_new_questions():
 
 
 def send_question_to_slack(row_number):
-    question_id = sheet.cell(
-        row_number, find_col_index(UTBK_COLS["QUESTION_ID"]) + 1
-    ).value
-    subject_name = sheet.cell(
-        row_number, find_col_index(UTBK_COLS["SUBJECT"]) + 1
-    ).value
-    chapter_name = sheet.cell(
-        row_number, find_col_index(UTBK_COLS["CHAPTER"]) + 1
-    ).value
-    topic_name = sheet.cell(row_number, find_col_index(UTBK_COLS["TOPIC"]) + 1).value
-    question_type = sheet.cell(
-        row_number, find_col_index(UTBK_COLS["QUESTION_TYPE"]) + 1
-    ).value
-    question = sheet.cell(row_number, find_col_index(UTBK_COLS["QUESTION"]) + 1).value
-    option_a = sheet.cell(row_number, find_col_index(UTBK_COLS["OPTION1"]) + 1).value
-    option_b = sheet.cell(row_number, find_col_index(UTBK_COLS["OPTION2"]) + 1).value
-    option_c = sheet.cell(row_number, find_col_index(UTBK_COLS["OPTION3"]) + 1).value
-    option_d = sheet.cell(row_number, find_col_index(UTBK_COLS["OPTION4"]) + 1).value
-    option_e = sheet.cell(row_number, find_col_index(UTBK_COLS["OPTION5"]) + 1).value
-    correct_option = sheet.cell(
-        row_number, find_col_index(UTBK_COLS["CORRECT_OPTION"]) + 1
-    ).value
-    solution_link = sheet.cell(
-        row_number, find_col_index(UTBK_COLS["SOLUTION_LINK"]) + 1
-    ).value
-    pic = sheet.cell(row_number, find_col_index(UTBK_COLS["PIC"]) + 1).value
-
-    blocks = [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": f"Question #{question_id}",
-                "emoji": True,
-            },
-        },
-        {
-            "type": "section",
-            "fields": [
-                {"type": "mrkdwn", "text": f"*Subject:*\n{subject_name}"},
-                {"type": "mrkdwn", "text": f"*Chapter:*\n{chapter_name}"},
-                {"type": "mrkdwn", "text": f"*Topic:*\n{topic_name}"},
-            ],
-        },
-        {"type": "divider"},
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "🚨 *The question failed to generate!* Please click *Lihat Soal* below for details.",
-            },
-        },
-        {"type": "divider"},
-        {
-            "type": "actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Lihat Soal",
-                        "emoji": True,
-                    },
-                    "url": solution_link,
-                },
-                {
-                    "type": "button",
-                    "text": {"type": "plain_text", "text": "Approve", "emoji": True},
-                    "style": "primary",
-                    "value": f"approve_{question_id}_{row_number}",
-                    "action_id": "approve_question",
-                },
-                {
-                    "type": "button",
-                    "text": {"type": "plain_text", "text": "Reject", "emoji": True},
-                    "style": "danger",
-                    "value": f"reject_{question_id}_{row_number}",
-                    "action_id": "reject_question",
-                },
-            ],
-        },
-    ]
-
-    full_blocks = [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": f"Question #{question_id}",
-                "emoji": True,
-            },
-        },
-        {
-            "type": "section",
-            "fields": [
-                {"type": "mrkdwn", "text": f"*Subject:*\n{subject_name}"},
-                {"type": "mrkdwn", "text": f"*Chapter:*\n{chapter_name}"},
-                {"type": "mrkdwn", "text": f"*Topic:*\n{topic_name}"},
-            ],
-        },
-        {"type": "divider"},
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*Pertanyaan:*\n{strip_html_tags(question)}",
-            },
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*Pilihan Jawaban:*\n"
-                + f"A: {strip_html_tags(option_a)}\n"
-                + f"B: {strip_html_tags(option_b)}\n"
-                + f"C: {strip_html_tags(option_c)}\n"
-                + f"D: {strip_html_tags(option_d)}\n"
-                + f"E: {strip_html_tags(option_e)}\n\n"
-                + f"*Jawaban Benar:* {correct_option}",
-            },
-        },
-        {"type": "divider"},
-        {
-            "type": "actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Lihat Solusi",
-                        "emoji": True,
-                    },
-                    "url": solution_link,
-                },
-                {
-                    "type": "button",
-                    "text": {"type": "plain_text", "text": "Approve", "emoji": True},
-                    "style": "primary",
-                    "value": f"approve_{question_id}_{row_number}",
-                    "action_id": "approve_question",
-                },
-                {
-                    "type": "button",
-                    "text": {"type": "plain_text", "text": "Reject", "emoji": True},
-                    "style": "danger",
-                    "value": f"reject_{question_id}_{row_number}",
-                    "action_id": "reject_question",
-                },
-            ],
-        },
-    ]
-    options = [option_a, option_b, option_c, option_d, option_e]
-    if (
-        contains_image(question)
-        or any(contains_image(opt) for opt in options)
-        or len(question) > 2900
-        or question_type != "MCQ"
-    ):
-        final_blocks = blocks
-    else:
-        final_blocks = full_blocks
-
     try:
+        question_id = sheet.cell(
+            row_number, find_col_index(UTBK_COLS["QUESTION_ID"]) + 1
+        ).value
+        subject_name = sheet.cell(
+            row_number, find_col_index(UTBK_COLS["SUBJECT"]) + 1
+        ).value
+        chapter_name = sheet.cell(
+            row_number, find_col_index(UTBK_COLS["CHAPTER"]) + 1
+        ).value
+        topic_name = sheet.cell(
+            row_number, find_col_index(UTBK_COLS["TOPIC"]) + 1
+        ).value
+        question_type = sheet.cell(
+            row_number, find_col_index(UTBK_COLS["QUESTION_TYPE"]) + 1
+        ).value
+        question = sheet.cell(
+            row_number, find_col_index(UTBK_COLS["QUESTION"]) + 1
+        ).value
+        option_a = sheet.cell(
+            row_number, find_col_index(UTBK_COLS["OPTION1"]) + 1
+        ).value
+        option_b = sheet.cell(
+            row_number, find_col_index(UTBK_COLS["OPTION2"]) + 1
+        ).value
+        option_c = sheet.cell(
+            row_number, find_col_index(UTBK_COLS["OPTION3"]) + 1
+        ).value
+        option_d = sheet.cell(
+            row_number, find_col_index(UTBK_COLS["OPTION4"]) + 1
+        ).value
+        option_e = sheet.cell(
+            row_number, find_col_index(UTBK_COLS["OPTION5"]) + 1
+        ).value
+        correct_option = sheet.cell(
+            row_number, find_col_index(UTBK_COLS["CORRECT_OPTION"]) + 1
+        ).value
+        rejection_notes = sheet.cell(
+            row_number, find_col_index(UTBK_COLS["REJECTION_NOTES"]) + 1
+        ).value
+        solution_link = sheet.cell(
+            row_number, find_col_index(UTBK_COLS["SOLUTION_LINK"]) + 1
+        ).value
+        pic = sheet.cell(row_number, find_col_index(UTBK_COLS["PIC"]) + 1).value
+
+        is_reassigned = bool(rejection_notes)
+
+        blocks = [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": f"Question #{question_id}"
+                    + (" (Reassigned)" if is_reassigned else ""),
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "section",
+                "fields": [
+                    {"type": "mrkdwn", "text": f"*Subject:*\n{subject_name}"},
+                    {"type": "mrkdwn", "text": f"*Chapter:*\n{chapter_name}"},
+                    {"type": "mrkdwn", "text": f"*Topic:*\n{topic_name}"},
+                ],
+            },
+        ]
+
+        if is_reassigned:
+            blocks.extend(
+                [
+                    {"type": "divider"},
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*Previous Rejection Note:*\n```{rejection_notes}```",
+                        },
+                    },
+                ]
+            )
+
+        options = [option_a, option_b, option_c, option_d, option_e]
+        show_simplified = (
+            contains_image(question)
+            or any(contains_image(opt) for opt in options)
+            or len(question) > 2900
+            or question_type != "MCQ"
+        )
+
+        if show_simplified:
+            blocks.extend(
+                [
+                    {"type": "divider"},
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "🚨 *The question failed to generate properly!* Please click *Lihat Soal* below for details.",
+                        },
+                    },
+                ]
+            )
+        else:
+            blocks.extend(
+                [
+                    {"type": "divider"},
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*Pertanyaan:*\n{strip_html_tags(question)}",
+                        },
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": (
+                                f"*Pilihan Jawaban:*\n"
+                                f"A: {strip_html_tags(option_a)}\n"
+                                f"B: {strip_html_tags(option_b)}\n"
+                                f"C: {strip_html_tags(option_c)}\n"
+                                f"D: {strip_html_tags(option_d)}\n"
+                                f"E: {strip_html_tags(option_e)}\n\n"
+                                f"*Jawaban Benar:* {correct_option}"
+                            ),
+                        },
+                    },
+                ]
+            )
+
+        blocks.extend(
+            [
+                {"type": "divider"},
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": (
+                                    "Lihat Soal" if show_simplified else "Lihat Solusi"
+                                ),
+                                "emoji": True,
+                            },
+                            "url": solution_link,
+                        },
+                        {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": "Approve",
+                                "emoji": True,
+                            },
+                            "style": "primary",
+                            "value": f"approve_{question_id}_{row_number}",
+                            "action_id": "approve_question",
+                        },
+                        {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": (
+                                    "Request Revision" if is_reassigned else "Reject"
+                                ),
+                                "emoji": True,
+                            },
+                            "style": "danger",
+                            "value": f"reject_{question_id}_{row_number}",
+                            "action_id": "reject_question",
+                        },
+                    ],
+                },
+            ]
+        )
+
         result = app.client.chat_postMessage(
             channel=pic,
-            text=f"Question #{question_id}",
-            blocks=final_blocks,
+            text=f"Question #{question_id} is coming... :cat-roomba-exceptionally-fast:",
+            blocks=blocks,
         )
+
         sheet.update_cell(
             row_number, find_col_index(UTBK_COLS["STATUS_QC"]) + 1, "Assigned"
         )
@@ -310,13 +325,15 @@ def send_question_to_slack(row_number):
             find_col_index(UTBK_COLS["STARTED_AT"]) + 1,
             convert_utc_to_jakarta(datetime.now(timezone.utc)),
         )
-        print(f"Sent question #{question_id} (row {row_number}) for QC")
+
+        print(f"Successfully sent question #{question_id} (row {row_number}) for QC")
         return True
+
     except SlackApiError as e:
         print(f"Error sending question to Slack: {e.response['error']}")
         return False
     except Exception as e:
-        print(f"General error sending question to Slack: {e}")
+        print(f"Unexpected error sending question to Slack: {str(e)}")
         return False
 
 
